@@ -1,2 +1,2 @@
-# Ethereal2ndProject
+# Ethereal
 야옹!
