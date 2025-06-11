@@ -14,6 +14,17 @@ variable "my_ip" {
   type        = string
 }
 
+variable "aws_region" {
+  description = "AWS region for the resources"
+  type        = string
+  default     = "ap-northeast-2" # 당신의 AWS 리전 기본값
+}
+
+variable "eks_cluster_name" {
+  description = "Name of the EKS cluster"
+  type        = string
+  default     = "ott-eks" # 당신의 EKS 클러스터 이름 기본값
+}
 
 variable "secret_key" {
   type = string

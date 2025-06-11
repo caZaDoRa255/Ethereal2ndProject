@@ -19,3 +19,5 @@ locals {
   public_subnet_ids   = module.vpc.public_subnets
 }
 
+data "aws_caller_identity" "current" {}
+
