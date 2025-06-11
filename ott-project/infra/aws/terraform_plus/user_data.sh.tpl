@@ -13,7 +13,7 @@ sudo -u ec2-user aws configure set region ap-northeast-2 --profile admin
 sudo -u ec2-user mkdir -p /home/ec2-user/bin
 
 # Download kubectl
-sudo curl -O  https://s3.us-west-2.amazonaws.com/amazon-eks/1.32.0/2024-12-20/bin/linux/amd64/kubectl
+sudo curl -O  https://s3.ap-northeast-2.amazonaws.com/amazon-eks/1.32.0/2024-12-20/bin/linux/amd64/kubectl
 
 # File Move
 sudo mv /kubectl /home/ec2-user/bin/kubectl 
@@ -69,7 +69,58 @@ spec:
 EOF
 
 
+
 # 적용
 sudo -u ec2-user /home/ec2-user/bin/kubectl apply -f /home/ec2-user/ott-project-app.yml -n argocd
 
 
+#-------------------------------------------------------------------
+
+# AWS Load Balancer Controller Argo CD Application 생성 및 적용
+# 이 부분은 ALB Controller를 Argo CD로 관리하기 위한 설정입니다.
+# !!! 중요: 'eks.amazonaws.com/role-arn' 부분의 ARN을 실제 Terraform이 생성할 ARN으로 교체해야 합니다.
+#          (<YOUR_AWS_ACCOUNT_ID> 부분을 당신의 AWS 계정 ID로 변경하고,
+#           'AmazonEKS_AWSLoadBalancerControllerRole-ott-eks'가 Terraform에서 생성한 IAM Role 이름과 일치하는지 확인하세요.)
+#          <최신 버전> 부분도 ALB Controller Helm Chart의 최신 안정 버전으로 교체해야 합니다. (예: 1.6.2)
+cat <<EOF > /home/ec2-user/alb-controller-app.yml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://aws.github.io/eks-charts # ALB Controller Helm Chart Repository
+    targetRevision: 1.13.2
+    chart: aws-load-balancer-controller
+    helm:
+      values: |
+        clusterName: ott-eks
+        serviceAccount:
+          create: true
+          name: aws-load-balancer-controller
+          annotations:
+            eks.amazonaws.com/role-arn: "arn:aws:iam::979202697408:role/AmazonEKS_AWSLoadBalancerControllerRole-ott-eks"
+        image:
+          repository: 602401143452.dkr.ecr.ap-northeast-2.amazonaws.com/amazon/aws-load-balancer-controller
+        region: ap-northeast-2
+        ALB Controller가 모든 네임스페이스의 Ingress를 감지하도록 설정 (권장)
+        watchNamespace: "" # 이 주석을 해제하거나 이 줄을 없애면 기본적으로 모든 네임스페이스 감지
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system # ALB Controller는 일반적으로 kube-system 네임스페이스에 설치됩니다.
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true # kube-system은 보통 있지만, 안전을 위해 추가
+EOF
+
+# AWS Load Balancer Controller Argo CD Application 적용
+sudo -u ec2-user /home/ec2-user/bin/kubectl apply -f /home/ec2-user/alb-controller-app.yml -n argocd
+
+echo "🎉 AWS Load Balancer Controller Argo CD Application 설치 완료."
+
+#-------------------------------------------------------------------
