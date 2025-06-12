@@ -4,3 +4,5 @@ secrets/
 node_modules/
 __pycache__/
 *.log
+*.tfvars
+*.bak

@@ -1,32 +1,29 @@
 #!/bin/bash
 
-# 기본 설정값 (하드코딩 필수: cloud-init은 변수를 제대로 인식 못할 수 있음)
+# 기본 설정값
 AWS_REGION="ap-northeast-2"
 CLUSTER_NAME="ott-eks"
 ACCOUNT_ID="979202697408"
 ROLE_NAME="BastionHostRole-ott-eks"
 PROFILE_NAME="admin"
-ACCESS_KEY="***REMOVED***6H7IHNDAPEPIIN4V"
-SECRET_KEY="n0UM85UUoog/hVa1r0iuuNYaF4AlZmXdOt9UFqeR"
+access_key    = "REPLACE_WITH_YOUR_ACCESS_KEY"
+secret_key    = "REPLACE_WITH_YOUR_SECRET_KEY"
 
-# 환경 변수 지정 (export만으로는 cloud-init에 불충분한 경우 있음)
+# 환경 변수 등록
 echo "export AWS_PROFILE=${PROFILE_NAME}" >> /home/ec2-user/.bashrc
 echo "export PATH=/home/ec2-user/bin:\$PATH" >> /home/ec2-user/.bashrc
 export AWS_PROFILE="${PROFILE_NAME}"
 export PATH=/home/ec2-user/bin:$PATH
 
-# 1. bin 디렉토리 생성
+# 1. bin 디렉토리 생성 및 kubectl 설치
 mkdir -p /home/ec2-user/bin
-
-# 2. kubectl 설치
 curl -LO "https://dl.k8s.io/release/v1.27.4/bin/linux/amd64/kubectl"
 chmod +x kubectl
 mv kubectl /home/ec2-user/bin/kubectl
 chown ec2-user:ec2-user /home/ec2-user/bin/kubectl
 
-# 3. AWS CLI Profile 구성
+# 2. AWS CLI Profile 구성
 mkdir -p /home/ec2-user/.aws
-
 cat <<EOF > /home/ec2-user/.aws/credentials
 [${PROFILE_NAME}]
 aws_access_key_id = ${ACCESS_KEY}
@@ -40,6 +37,14 @@ output = json
 EOF
 
 chown -R ec2-user:ec2-user /home/ec2-user/.aws
+
+# 3. EKS 클러스터 준비될 때까지 대기
+echo "⏳ Waiting for EKS cluster to become ACTIVE..."
+until [ "$(aws eks describe-cluster --name ${CLUSTER_NAME} --region ${AWS_REGION} --query 'cluster.status' --output text --profile ${PROFILE_NAME})" == "ACTIVE" ]; do
+  echo "🔄 Cluster status is not ACTIVE yet. Waiting 10s..."
+  sleep 10
+done
+echo "✅ Cluster is ACTIVE!"
 
 # 4. kubeconfig 구성
 sudo -u ec2-user aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER_NAME}" --profile "${PROFILE_NAME}"
