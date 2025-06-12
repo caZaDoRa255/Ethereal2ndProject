@@ -42,17 +42,27 @@ resource "aws_security_group" "bastion_sg" {
 }
 
 resource "aws_instance" "bastion" {
-  ami                         = "ami-0eb302fcc77c2f8bd" # Amazon Linux 2 (서울 리전)
+  ami                         = "ami-0e967ff96936c0c0c" # Amazon Linux 2.23 (서울 리전)
   instance_type               = "t2.micro"
   subnet_id                   = local.public_subnet_ids[0]
   vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
   associate_public_ip_address = true
   iam_instance_profile = aws_iam_instance_profile.bastion_instance_profile.name # 이 줄 추가
   key_name                    = "kyes-key" # 실제 EC2 키페어 이름으로 교체
+
+  metadata_options {
+    http_tokens = "optional"
+  }
+
   user_data = templatefile("${path.module}/user_data.sh.tpl",
     {
       ACCESS_KEY = var.access_key
       SECRET_KEY = var.secret_key
+      CLUSTER_NAME = var.eks_cluster_name
+      ACCOUNT_ID     = data.aws_caller_identity.current.account_id
+      ROLE_NAME = var.role_name
+      AWS_REGION = var.aws_region
+      PROFILE_NAME  = var.profile_name
     }
   )
 

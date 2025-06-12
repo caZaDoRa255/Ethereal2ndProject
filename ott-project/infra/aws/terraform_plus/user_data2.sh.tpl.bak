@@ -1,56 +1,46 @@
 #!/bin/bash
 
-# 기본 설정값 (하드코딩 필수: cloud-init은 변수를 제대로 인식 못할 수 있음)
+# ✅ 환경 변수 설정
 AWS_REGION="ap-northeast-2"
 CLUSTER_NAME="ott-eks"
 ACCOUNT_ID="979202697408"
-ROLE_NAME="BastionHostRole-ott-eks"
-PROFILE_NAME="admin"
-ACCESS_KEY="***REMOVED***6H7IHNDAPEPIIN4V"
-SECRET_KEY="n0UM85UUoog/hVa1r0iuuNYaF4AlZmXdOt9UFqeR"
+ROLE_NAME="AmazonEKS_AWSLoadBalancerControllerRole-${CLUSTER_NAME}"
 
-# 환경 변수 지정 (export만으로는 cloud-init에 불충분한 경우 있음)
-echo "export AWS_PROFILE=${PROFILE_NAME}" >> /home/ec2-user/.bashrc
-echo "export PATH=/home/ec2-user/bin:\$PATH" >> /home/ec2-user/.bashrc
-export AWS_PROFILE="${PROFILE_NAME}"
-export PATH=/home/ec2-user/bin:$PATH
+# Create bin directory
+sudo -u ec2-user mkdir -p /home/ec2-user/bin
 
-# 1. bin 디렉토리 생성
-mkdir -p /home/ec2-user/bin
-
-# 2. kubectl 설치
+# Download kubectl
 curl -LO "https://dl.k8s.io/release/v1.27.4/bin/linux/amd64/kubectl"
 chmod +x kubectl
 mv kubectl /home/ec2-user/bin/kubectl
 chown ec2-user:ec2-user /home/ec2-user/bin/kubectl
 
-# 3. AWS CLI Profile 구성
-mkdir -p /home/ec2-user/.aws
+# 직접 PATH 설정 (bashrc 적용 기다릴 필요 없이)
+export PATH=/home/ec2-user/bin:$PATH
 
-cat <<EOF > /home/ec2-user/.aws/credentials
-[${PROFILE_NAME}]
-aws_access_key_id = ${ACCESS_KEY}
-***REMOVED*** = ${SECRET_KEY}
-EOF
+# ✅ AWS CLI 설정 (admin 프로파일)
+sudo -u ec2-user aws configure set aws_access_key_id "${ACCESS_KEY}" --profile admin
+sudo -u ec2-user aws configure set ***REMOVED*** "${SECRET_KEY}" --profile admin
+sudo -u ec2-user aws configure set region $AWS_REGION --profile admin
 
-cat <<EOF > /home/ec2-user/.aws/config
-[profile ${PROFILE_NAME}]
-region = ${AWS_REGION}
-output = json
-EOF
+# ✅ kubeconfig 설정
+sudo -u ec2-user aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME --profile admin
 
-chown -R ec2-user:ec2-user /home/ec2-user/.aws
-
-# 4. kubeconfig 구성
-sudo -u ec2-user aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER_NAME}" --profile "${PROFILE_NAME}"
-
-# 5. Argo CD 설치
+# ---------------------------------------
+# ✅ Argo CD 설치
+# ---------------------------------------
 sudo -u ec2-user /home/ec2-user/bin/kubectl create namespace argocd
-sudo -u ec2-user /home/ec2-user/bin/kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-sudo -u ec2-user /home/ec2-user/bin/kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
-echo "🎉 Argo CD 설치 완료"
 
-# 6. Argo CD App: React 프론트엔드
+sudo -u ec2-user /home/ec2-user/bin/kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# ✅ ArgoCD 서버 노출 (LoadBalancer)
+sudo -u ec2-user /home/ec2-user/bin/kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
+
+echo "🎉 Argo CD 설치 완료. 잠시 후 LoadBalancer 주소가 발급됩니다."
+
+# ---------------------------------------
+# ✅ Argo CD App: React Frontend 배포용
+# ---------------------------------------
 cat <<EOF > /home/ec2-user/ott-project-app.yml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -74,7 +64,9 @@ EOF
 
 sudo -u ec2-user /home/ec2-user/bin/kubectl apply -f /home/ec2-user/ott-project-app.yml -n argocd
 
-# 7. ALB Controller App 배포
+# ---------------------------------------
+# ✅ Argo CD App: AWS Load Balancer Controller (Helm)
+# ---------------------------------------
 cat <<EOF > /home/ec2-user/alb-controller-app.yml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -98,7 +90,7 @@ spec:
         image:
           repository: 602401143452.dkr.ecr.ap-northeast-2.amazonaws.com/amazon/aws-load-balancer-controller
         region: ${AWS_REGION}
-        watchNamespace: ""
+        watchNamespace: "" # 모든 네임스페이스 감시
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
@@ -112,4 +104,4 @@ EOF
 
 sudo -u ec2-user /home/ec2-user/bin/kubectl apply -f /home/ec2-user/alb-controller-app.yml -n argocd
 
-echo "🎉 AWS Load Balancer Controller Argo CD Application 설치 완료"
+echo "🎉 AWS Load Balancer Controller Argo CD Application 설치 완료."

@@ -38,17 +38,16 @@ resource "aws_iam_policy" "eks_describe_cluster_policy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      {
+            {
         Effect = "Allow"
         Action = [
           "eks:DescribeCluster",
-          "eks:ListClusters", # 클러스터 목록을 볼 수 있도록 추가
-          "eks:AccessKubernetesApi", # kubectl 연결을 위해 필요
+          "eks:ListClusters",
+          "eks:AccessKubernetesApi",
           "eks:DescribeNodegroup",
           "eks:ListNodegroups"
         ]
-        Resource = "arn:aws:eks:ap-northeast-2:979202697408:cluster/ott-eks"
-        # Resource = "arn:aws:eks:ap-northeast-2:979202697408:cluster/ott-eks" # 위와 같이 직접 ARN을 넣어도 됨
+        Resource = "*"
       },
       {
         Effect = "Allow"
