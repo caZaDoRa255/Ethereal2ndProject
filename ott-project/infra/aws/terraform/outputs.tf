@@ -18,3 +18,8 @@ output "vpc_id" {
 output "private_subnet_ids" {
   value = module.vpc.private_subnets
 }
+
+output "bastion_public_ip" {
+  value = aws_instance.bastion.public_ip
+  description = "The public IP address of the bastion host"
+}
