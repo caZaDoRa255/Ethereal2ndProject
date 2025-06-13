@@ -20,7 +20,7 @@ export PATH=/home/ec2-user/bin:$PATH
 
 # ✅ AWS CLI 설정 (admin 프로파일)
 sudo -u ec2-user aws configure set aws_access_key_id "${ACCESS_KEY}" --profile admin
-sudo -u ec2-user aws configure set ***REMOVED*** "${SECRET_KEY}" --profile admin
+sudo -u ec2-user aws configure set aws_secret_access_key "${SECRET_KEY}" --profile admin
 sudo -u ec2-user aws configure set region $AWS_REGION --profile admin
 
 # ✅ kubeconfig 설정

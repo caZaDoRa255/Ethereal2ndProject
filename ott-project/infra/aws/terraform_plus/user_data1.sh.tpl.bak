@@ -6,7 +6,7 @@ SECRET_KEY="${SECRET_KEY}"
 
 # AWS CLI configure
 sudo -u ec2-user aws configure set aws_access_key_id "${ACCESS_KEY}" --profile admin
-sudo -u ec2-user aws configure set ***REMOVED*** "${SECRET_KEY}" --profile admin
+sudo -u ec2-user aws configure set aws_secret_access_key "${SECRET_KEY}" --profile admin
 sudo -u ec2-user aws configure set region ap-northeast-2 --profile admin
 
 # Create bin directory and move kubectl there
